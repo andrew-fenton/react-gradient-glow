@@ -1,7 +1,7 @@
 import AnimatedText from "@/components/animated-text";
 import ASCIIAnimation from "@/components/ascii-animation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import VideoASCIICoin from "@/components/video-ascii-coin";
+// import VideoASCIICoin from "@/components/video-ascii-coin";
 import Link from "next/link";
 
 export default function Home() {
@@ -19,6 +19,22 @@ export default function Home() {
 							colorOverlay={true}
 							frameCount={300}
 							frameFolder="frames-fire"
+						/>
+					</CardContent>
+				</Card>
+			</div>
+
+            <div className="grid grid-cols-6 gap-8 mb-8 w-full items-center">
+				<Card className="col-span-4 my-36 col-start-2">
+					<CardHeader>
+						<CardTitle>Koi Animation</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<ASCIIAnimation
+							fps={15}
+							colorOverlay={true}
+							frameCount={266}
+							frameFolder="frames-koi"
 						/>
 					</CardContent>
 				</Card>

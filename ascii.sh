@@ -17,6 +17,7 @@ ASCII_CHARS=" .'\`^,:;Il!i><~+_-?][}{1)(|/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B
 VIDEO_FORMATS=("mp4" "mkv" "mov" "avi")
 OUTPUT_FPS=30
 OUTPUT_COLUMNS=80
+JOBS="${JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)}"
 
 # --- Functions ---
 
@@ -55,6 +56,51 @@ pixel_for() {
 }
 
 #
+# Converts a single extracted PNG frame into ASCII art.
+#
+# @param $1: The extracted PNG frame
+#
+process_frame() {
+    local f="$1"
+    local squished_image_file="${f%.png}_squished.png"
+    local image_height
+    image_height=$(magick identify -ping -format '%h' "$f")
+    local new_height
+    new_height=$(awk -v ratio="$FONT_RATIO" -v height="$image_height" 'BEGIN{print int(ratio * height + 0.5)}')
+
+    magick "$f" -resize "x$new_height"'!' "$squished_image_file"
+
+    local imagemagick_text_file="${f%.png}_im.txt"
+    local output_text_file="${f%.png}.txt"
+
+    magick "$squished_image_file" "$imagemagick_text_file"
+
+    local last_row=-1
+    {
+        tail -n +2 "$imagemagick_text_file" | while read -r line; do
+            local xy_part="${line%% *}"
+            local rgb_part="${line#*srgb(}"
+            local rgb="${rgb_part%')'}"
+            local row="${xy_part#*,}"
+            row="${row%:}"
+
+            if [[ "$row" != "$last_row" ]]; then
+                if (( last_row != -1 )); then
+                    echo ""
+                fi
+                last_row=$row
+            fi
+
+            pixel_for "$rgb"
+        done
+        echo ""
+    } > "$output_text_file"
+
+    rm "$f" "$squished_image_file" "$imagemagick_text_file"
+    echo "Processed ${f##*/}"
+}
+
+#
 # Extracts frames from a video, converts them to text, and processes them into ASCII art.
 #
 # @param $1: The video file
@@ -74,42 +120,11 @@ generate_frame_images() {
         "$frame_images_dir/frame_%04d.png"
 
     echo "Processing frames into ASCII..."
-    for f in $(find "$frame_images_dir" -name '*.png' | sort); do
-        local squished_image_file="${f%.png}_squished.png"
-        local image_height
-        image_height=$(magick identify -ping -format '%h' "$f")
-        local new_height
-        new_height=$(awk -v ratio="$FONT_RATIO" -v height="$image_height" 'BEGIN{print int(ratio * height + 0.5)}')
+    echo "Using $JOBS parallel workers."
+    export ASCII_CHARS FONT_RATIO LUMINANCE_THRESHOLD MAGICK_THREAD_LIMIT=1
+    export -f pixel_for process_frame
 
-        magick "$f" -resize "x$new_height"'!' "$squished_image_file"
-
-        local imagemagick_text_file="${f%.png}_im.txt"
-        local output_text_file="${f%.png}.txt"
-
-        magick "$squished_image_file" "$imagemagick_text_file"
-
-        local last_row=-1
-        tail -n +2 "$imagemagick_text_file" | while read -r line; do
-            local xy_part="${line%% *}"
-            local rgb_part="${line#*srgb(}"
-            local rgb="${rgb_part%')'}"
-            local row="${xy_part#*,}"
-            row="${row%:}"
-
-            if [[ "$row" != "$last_row" ]]; then
-                if (( last_row != -1 )); then
-                    echo "" >> "$output_text_file"
-                fi
-                last_row=$row
-            fi
-
-            pixel_for "$rgb" >> "$output_text_file"
-        done
-        echo "" >> "$output_text_file"
-
-        rm "$f" "$squished_image_file" "$imagemagick_text_file"
-        echo "Processed ${f##*/}"
-    done
+    find "$frame_images_dir" -name '*.png' | sort | xargs -n 1 -P "$JOBS" bash -c 'process_frame "$1"' _
     echo "ASCII generation complete."
 }
 
