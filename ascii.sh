@@ -7,22 +7,26 @@ FONT_RATIO="0.44"
 
 # Any pixel with a brightness below this value (0-255) will be treated as transparent.
 # Increase this to remove more of the dark areas from the image.
-LUMINANCE_THRESHOLD=30
+LUMINANCE_THRESHOLD=45
 
 # A string of characters to represent pixels, from darkest to lightest.
-# The backtick is escaped with a backslash (\`) to prevent a syntax error.
-ASCII_CHARS=" .'\`^,:;Il!i><~+_-?][}{1)(|/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$"
+# ASCII_CHARS=" .:-=+*#%@"
+ASCII_CHARS=" *#%@"
+
+# Set to "koi" to keep orange/white fish-like pixels and blank likely background.
+# Set COLOR_MASK=none when converting non-koi videos.
+COLOR_MASK="${COLOR_MASK:-koi}"
 
 # Video processing settings
 VIDEO_FORMATS=("mp4" "mkv" "mov" "avi")
-OUTPUT_FPS=30
-OUTPUT_COLUMNS=80
+OUTPUT_FPS=60
+OUTPUT_COLUMNS=160
 JOBS="${JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)}"
 
 # --- Functions ---
 
 #
-# Outputs the appropriate ASCII character for a given RGB color based on its luminance.
+# Outputs the appropriate ASCII character for a given RGB color.
 #
 # @param $1: The r,g,b Pixel (e.g., "255,215,0")
 #
@@ -30,29 +34,42 @@ pixel_for() {
     local r g b
     IFS=',' read -r r g b <<< "$1"
 
-    # Calculate relative luminance (a measure of brightness) from 0-255.
-    local luminance
-    luminance=$(awk -v r="$r" -v g="$g" -v b="$b" 'BEGIN{print int(0.2126*r + 0.7152*g + 0.0722*b)}')
+    awk \
+        -v r="$r" \
+        -v g="$g" \
+        -v b="$b" \
+        -v threshold="$LUMINANCE_THRESHOLD" \
+        -v chars="$ASCII_CHARS" \
+        -v color_mask="$COLOR_MASK" '
+        function abs(x) { return x < 0 ? -x : x }
+        BEGIN {
+            luminance = int(0.2126 * r + 0.7152 * g + 0.0722 * b + 0.5)
 
-    # If the pixel's brightness is below our threshold, render it as a blank space.
-    if (( luminance < LUMINANCE_THRESHOLD )); then
-        echo -n " "
-        return
-    fi
+            if (luminance < threshold) {
+                printf " "
+                exit
+            }
 
-    # Map the remaining luminance range (THRESHOLD to 255) to our character set
-    # to maintain full contrast on the parts of the image we want to see.
-    local num_chars=${#ASCII_CHARS}
-    local effective_luminance=$((luminance - LUMINANCE_THRESHOLD))
-    local luminance_range=$((255 - LUMINANCE_THRESHOLD))
+            if (color_mask == "koi") {
+                orange = r > 110 && g > 45 && b < 135 && r > b * 1.35 && g > b * 0.8
+                white = luminance > 185 && abs(r - g) < 60 && abs(g - b) < 60 && abs(r - b) < 60
 
-    # Prevent division by zero if threshold is set to 255
-    if (( luminance_range <= 0 )); then luminance_range=1; fi
+                if (!(orange || white)) {
+                    printf " "
+                    exit
+                }
+            }
 
-    local char_index=$(( (effective_luminance * (num_chars - 1)) / luminance_range ))
+            char_count = length(chars)
+            effective_luminance = luminance - threshold
+            luminance_range = 255 - threshold
+            if (luminance_range <= 0) {
+                luminance_range = 1
+            }
 
-    # Print the character at the calculated index.
-    echo -n "${ASCII_CHARS:$char_index:1}"
+            char_index = int((effective_luminance * (char_count - 1)) / luminance_range) + 1
+            printf "%s", substr(chars, char_index, 1)
+        }'
 }
 
 #
@@ -121,7 +138,7 @@ generate_frame_images() {
 
     echo "Processing frames into ASCII..."
     echo "Using $JOBS parallel workers."
-    export ASCII_CHARS FONT_RATIO LUMINANCE_THRESHOLD MAGICK_THREAD_LIMIT=1
+    export ASCII_CHARS COLOR_MASK FONT_RATIO LUMINANCE_THRESHOLD MAGICK_THREAD_LIMIT=1
     export -f pixel_for process_frame
 
     find "$frame_images_dir" -name '*.png' | sort | xargs -n 1 -P "$JOBS" bash -c 'process_frame "$1"' _

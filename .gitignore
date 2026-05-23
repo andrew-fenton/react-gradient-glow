@@ -24,6 +24,10 @@
 .DS_Store
 *.pem
 
+# generated ASCII frames
+/ascii_frames_*/
+/public/frames-*/
+
 # debug
 npm-debug.log*
 yarn-debug.log*

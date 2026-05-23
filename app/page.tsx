@@ -8,33 +8,33 @@ export default function Home() {
 	return (
 		<main className="flex items-center flex-col m-auto max-w-6xl px-4">
 			{/* ASCII Animations */}
-			<div className="grid grid-cols-6 gap-8 mb-8 w-full items-center">
-				<Card className="col-span-4 my-36 col-start-2">
+			<div className="grid grid-cols-10 gap-8 mb-8 w-full items-center">
+				<Card className="col-span-10 my-36 col-start-2">
 					<CardHeader>
 						<CardTitle>Fire Animation</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<ASCIIAnimation
 							fps={60}
-							colorOverlay={true}
-							frameCount={300}
-							frameFolder="frames-fire"
+							colorOverlay={false}
+							frameCount={600}
+							frameFolder="frames-koi-white"
 						/>
 					</CardContent>
 				</Card>
 			</div>
 
-            <div className="grid grid-cols-6 gap-8 mb-8 w-full items-center">
-				<Card className="col-span-4 my-36 col-start-2">
+            <div className="grid grid-cols-8 gap-8 mb-8 w-full items-center">
+				<Card className="col-span-8 my-36 col-start-2">
 					<CardHeader>
 						<CardTitle>Koi Animation</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<ASCIIAnimation
-							fps={15}
-							colorOverlay={true}
-							frameCount={266}
-							frameFolder="frames-koi"
+							fps={60}
+							colorOverlay={false}
+							frameCount={600}
+							frameFolder="frames-koi-diff-chars"
 						/>
 					</CardContent>
 				</Card>
